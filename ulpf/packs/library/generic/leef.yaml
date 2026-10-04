@@ -1,0 +1,42 @@
+id: generic.leef
+version: "1.0"
+vendor: Generic
+product: LEEF producer
+category: any
+description: Standard LEEF 1.0/2.0 predefined attributes for any QRadar-format device.
+priority: 10
+match:
+  formats: [leef]
+parse:
+  - {type: syslog, required: false}
+  - {type: leef, source: message, when: {field: message, contains: "LEEF:"}}
+  - {type: leef, when: {field: device_vendor, exists: false}, required: false}
+mapping:
+  time: {field: devTime, cast: timestamp}
+  metadata.product.vendor_name: device_vendor
+  metadata.product.name: device_product
+  metadata.product.version: device_version
+  metadata.event_code: event_id
+  device.hostname: syslog_host
+  src_endpoint.ip: src
+  src_endpoint.port: srcPort
+  src_endpoint.mac: srcMAC
+  dst_endpoint.ip: dst
+  dst_endpoint.port: dstPort
+  dst_endpoint.mac: dstMAC
+  connection_info.protocol_name: {field: proto, cast: lower}
+  actor.user.name: usrName
+  traffic.bytes_out: srcBytes
+  traffic.bytes_in: dstBytes
+  disposition_id: {field: action, map: {allow: 1, accept: 1, permit: 1, deny: 2, block: 2, drop: 6}, default: 0}
+  action_id: {field: action, map: {allow: 1, accept: 1, permit: 1, deny: 2, block: 2, drop: 2}, default: 0}
+severity_id:
+  field: sev
+  map: {"1": 1, "2": 1, "3": 2, "4": 2, "5": 3, "6": 3, "7": 4, "8": 4, "9": 5, "10": 5}
+  default: 1
+classes:
+  - name: network
+    class: network_activity
+    activity_id: {const: 6}
+    mapping:
+      message: cat

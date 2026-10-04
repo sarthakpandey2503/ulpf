@@ -1,0 +1,72 @@
+id: paloalto.panos
+version: "1.0"
+vendor: Palo Alto Networks
+product: PAN-OS
+category: firewall
+description: PAN-OS syslog CSV (TRAFFIC and THREAT logs, PAN-OS 10.x field order).
+priority: 60
+match:
+  formats: [csv]
+  regex: ',(TRAFFIC|THREAT),'
+parse:
+  - {type: syslog}
+  - type: csv
+    source: message
+    columns_by:
+      index: 3
+      map:
+        TRAFFIC: [_skip, receive_time, serial, type, subtype, _skip, generated_time, src, dst, natsrc, natdst, rule, srcuser, dstuser, app, vsys, from_zone, to_zone, inbound_if, outbound_if, log_action, _skip, sessionid, repeatcnt, sport, dport, natsport, natdport, flags, proto, action, bytes, bytes_sent, bytes_received, packets, start, elapsed, category, _skip, seqno, actionflags, srcloc, dstloc, _skip, pkts_sent, pkts_received, session_end_reason]
+        THREAT: [_skip, receive_time, serial, type, subtype, _skip, generated_time, src, dst, natsrc, natdst, rule, srcuser, dstuser, app, vsys, from_zone, to_zone, inbound_if, outbound_if, log_action, _skip, sessionid, repeatcnt, sport, dport, natsport, natdport, flags, proto, action, misc, threatid, category, severity, direction, seqno, actionflags, srcloc, dstloc]
+mapping:
+  time: {field: generated_time, cast: timestamp, format: "%Y/%m/%d %H:%M:%S"}
+  device.hostname: syslog_host
+  device.uid: serial
+  device.type_id: {const: 9}
+  src_endpoint.ip: src
+  src_endpoint.port: sport
+  src_endpoint.zone: from_zone
+  src_endpoint.interface_name: inbound_if
+  src_endpoint.location.country: srcloc
+  dst_endpoint.ip: dst
+  dst_endpoint.port: dport
+  dst_endpoint.zone: to_zone
+  dst_endpoint.interface_name: outbound_if
+  dst_endpoint.location.country: dstloc
+  connection_info.protocol_name: {field: proto, cast: lower}
+  connection_info.session.uid: sessionid
+  firewall_rule.name: rule
+  actor.user.name: srcuser
+  app_name: app
+classes:
+  - name: traffic
+    when: {field: type, equals: TRAFFIC}
+    class: network_activity
+    activity_id: {field: subtype, map: {start: 1, end: 2, drop: 5, deny: 5}, default: 6}
+    mapping:
+      disposition_id: {field: action, map: {allow: 1, deny: 2, drop: 6, drop-icmp: 6, reset-client: 21, reset-server: 21, reset-both: 21}, default: 0}
+      action_id: {field: action, map: {allow: 1, deny: 2, drop: 2, reset-client: 2, reset-server: 2, reset-both: 2}, default: 0}
+      traffic.bytes: bytes
+      traffic.bytes_out: bytes_sent
+      traffic.bytes_in: bytes_received
+      traffic.packets: packets
+      traffic.packets_out: pkts_sent
+      traffic.packets_in: pkts_received
+      start_time: {field: start, cast: timestamp, format: "%Y/%m/%d %H:%M:%S"}
+      duration: {field: elapsed, scale: 1000}
+      status_detail: session_end_reason
+  - name: threat
+    when: {field: type, equals: THREAT}
+    class: detection_finding
+    activity_id: {const: 1}
+    severity_id: {field: severity, map: {informational: 1, low: 2, medium: 3, high: 4, critical: 5}, default: 3}
+    mapping:
+      finding_info.title: {field: threatid, regex: '^(?P<v>.*?)\s*\(\d+\)$', map_default_passthrough: true}
+      finding_info.uid: {field: threatid, regex: '\((?P<v>\d+)\)$'}
+      finding_info.types: {field: subtype, template: "{subtype}"}
+      disposition_id: {field: action, map: {alert: 19, allow: 1, deny: 2, drop: 6, reset-client: 21, reset-server: 21, reset-both: 21, block-url: 2}, default: 0}
+      action_id: {field: action, map: {alert: 3, allow: 1, deny: 2, drop: 2, reset-client: 2, reset-server: 2, reset-both: 2}, default: 0}
+      evidences[0].src_endpoint.ip: src
+      evidences[0].src_endpoint.port: sport
+      evidences[0].dst_endpoint.ip: dst
+      evidences[0].dst_endpoint.port: dport
+      evidences[0].url.url_string: misc

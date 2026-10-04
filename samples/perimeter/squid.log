@@ -1,0 +1,4 @@
+1790581502.123    215 10.60.1.14 TCP_TUNNEL/200 4512 CONNECT www.example.com:443 alice HIER_DIRECT/93.184.216.34 -
+1790581510.450     12 10.60.1.22 TCP_DENIED/403 3921 GET http://malware.example/payload.exe - HIER_NONE/- text/html
+1790581522.010    390 10.60.1.14 TCP_MISS/200 18233 GET http://updates.vendor.example/feed.xml alice HIER_DIRECT/203.0.113.80 application/xml
+1790581530.777     44 10.60.1.31 TCP_MISS/404 512 POST http://198.51.100.120/gate.php - HIER_DIRECT/198.51.100.120 text/html

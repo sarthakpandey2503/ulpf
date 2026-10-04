@@ -1,0 +1,17 @@
+# Core runtime (pinned; regenerate hashes for air-gap bundles with `pip download --require-hashes`)
+fastapi==0.141.1
+uvicorn==0.54.0
+pydantic==2.13.5
+PyYAML==6.0.3
+defusedxml==0.7.1
+google-re2==1.1.20251105
+cryptography==50.0.1
+drain3==0.9.11
+httpx==0.28.1
+jsonschema==4.26.0
+pyarrow==25.0.1
+pySigma==1.5.1
+
+# Optional big-data backends
+aiokafka==0.14.0
+clickhouse-connect==1.9.0

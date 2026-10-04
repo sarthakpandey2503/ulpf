@@ -1,0 +1,107 @@
+# ULPF deployment.
+#   Lite (single container, in-memory bus + SQLite):   docker compose -f deploy/docker-compose.yml up ulpf
+#   Full big-data stack (Redpanda, ClickHouse, MinIO, Ollama):
+#                                                      docker compose -f deploy/docker-compose.yml --profile full up -d
+# Create secrets first:  ./deploy/make-secrets.sh
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp"]
+  restart: unless-stopped
+
+x-ulpf-env: &ulpf-env
+  ULPF_TOKENS_FILE: /run/secrets/ulpf_tokens
+  ULPF_REQUIRE_SIGNED_PACKS: "true"
+
+services:
+  ulpf:
+    <<: *hardening
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    image: ulpf:0.1.0
+    environment:
+      <<: *ulpf-env
+      ULPF_SINKS: sqlite,parquet
+    ports: ["127.0.0.1:8080:8080", "5514:5514/udp", "5514:5514/tcp", "6514:6514/tcp"]
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080", "--syslog", "--syslog-tls-cert", "/run/secrets/syslog_cert", "--syslog-tls-key", "/run/secrets/syslog_key", "--syslog-tls-ca", "/run/secrets/syslog_ca"]
+    volumes: ["ulpf-data:/var/lib/ulpf"]
+    secrets: [ulpf_tokens, syslog_cert, syslog_key, syslog_ca]
+
+  # ---------- full profile ----------
+  ulpf-worker:
+    <<: *hardening
+    profiles: [full]
+    image: ulpf:0.1.0
+    command: ["worker"]
+    deploy: { replicas: 2 }
+    environment:
+      <<: *ulpf-env
+      ULPF_BUS: kafka
+      ULPF_KAFKA_BOOTSTRAP: redpanda:9092
+      ULPF_SINKS: clickhouse,parquet
+      ULPF_CLICKHOUSE_URL: http://ulpf:@clickhouse:8123
+      ULPF_CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_password
+      ULPF_S3_ENDPOINT: http://minio:9000
+      ULPF_S3_ACCESS_KEY_FILE: /run/secrets/minio_user
+      ULPF_S3_SECRET_KEY_FILE: /run/secrets/minio_password
+    volumes: ["ulpf-data:/var/lib/ulpf"]
+    secrets: [ulpf_tokens, clickhouse_password, minio_user, minio_password]
+    depends_on: [redpanda, clickhouse, minio]
+
+  redpanda:
+    profiles: [full]
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start --overprovisioned --smp 1 --memory 1G --reserve-memory 0M
+      - --kafka-addr PLAINTEXT://0.0.0.0:9092 --advertise-kafka-addr PLAINTEXT://redpanda:9092
+      - --set redpanda.auto_create_topics_enabled=true
+    volumes: ["redpanda-data:/var/lib/redpanda/data"]
+    security_opt: ["no-new-privileges:true"]
+
+  clickhouse:
+    profiles: [full]
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_USER: ulpf
+      CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "0"
+    ports: ["127.0.0.1:8123:8123"]
+    volumes: ["clickhouse-data:/var/lib/clickhouse"]
+    secrets: [clickhouse_password]
+    security_opt: ["no-new-privileges:true"]
+
+  minio:
+    profiles: [full]
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_password
+    ports: ["127.0.0.1:9001:9001"]
+    volumes: ["minio-data:/data"]
+    secrets: [minio_user, minio_password]
+    security_opt: ["no-new-privileges:true"]
+
+  ollama:
+    profiles: [full]
+    image: ollama/ollama:0.3.14
+    # Air-gapped: pre-pull the model on a connected host and ship ~/.ollama with the bundle.
+    volumes: ["ollama-models:/root/.ollama"]
+    security_opt: ["no-new-privileges:true"]
+
+secrets:
+  ulpf_tokens: { file: ./secrets/ulpf_tokens.json }
+  syslog_cert: { file: ./secrets/syslog.crt }
+  syslog_key: { file: ./secrets/syslog.key }
+  syslog_ca: { file: ./secrets/ca.crt }
+  clickhouse_password: { file: ./secrets/clickhouse_password }
+  minio_user: { file: ./secrets/minio_user }
+  minio_password: { file: ./secrets/minio_password }
+
+volumes:
+  ulpf-data: {}
+  redpanda-data: {}
+  clickhouse-data: {}
+  minio-data: {}
+  ollama-models: {}

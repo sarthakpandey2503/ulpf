@@ -1,0 +1,31 @@
+id: nginx.access
+version: "1.0"
+vendor: F5 / NGINX
+product: NGINX (combined log format)
+category: web-gateway
+description: NGINX / Apache combined access log at the internet edge (reverse proxy, WAF front).
+priority: 50
+match:
+  regex: '^\S+ \S+ \S+ \[\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}\] "'
+parse:
+  - type: grok
+    pattern: '^%{IPORHOST:client_ip} %{NOTSPACE:ident} %{NOTSPACE:auth_user} \[%{HTTPDATE:ts}\] "%{WORD:method} %{NOTSPACE:request_uri} HTTP/%{NUMBER:http_version}" %{INT:status} %{INT:bytes} "%{DATA:referrer}" "%{DATA:user_agent}"'
+mapping:
+  time: {field: ts, cast: timestamp, format: "%d/%b/%Y:%H:%M:%S %z"}
+  src_endpoint.ip: client_ip
+  dst_endpoint.svc_name: {const: nginx}
+  http_request.http_method: method
+  http_request.url.url_string: request_uri
+  http_request.url.path: {field: request_uri, regex: '^(?P<v>[^?]*)'}
+  http_request.url.query_string: {field: request_uri, regex: '\?(?P<v>.*)$'}
+  http_request.version: http_version
+  http_request.referrer: {field: referrer, map: {"-": null}, map_default_passthrough: true}
+  http_request.user_agent: user_agent
+  http_response.code: status
+  http_response.length: bytes
+  actor.user.name: {field: auth_user, map: {"-": null}, map_default_passthrough: true}
+  status_id: {field: status, regex: '^(?P<v>[45])', map: {"4": 2, "5": 2}, default: 1}
+classes:
+  - name: access
+    class: http_activity
+    activity_id: {field: method, map: {connect: 1, delete: 2, get: 3, head: 4, options: 5, post: 6, put: 7, trace: 8}, default: 99}

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ulpf"
+version = "0.1.0"
+description = "Universal Log Pre-processing Framework: lossless, OCSF-normalized, detection-validated log pipeline"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+
+[project.scripts]
+ulpf = "ulpf.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ulpf*"]
+
+[tool.setuptools.package-data]
+ulpf = ["normalizer/*.json", "validator/*.json", "packs/library/**/*.yaml", "packs/library/**/*.sig", "packs/trusted/*.pub", "packs/*.json", "aigen/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.bandit]
+exclude_dirs = ["tests", "third_party", ".venv"]

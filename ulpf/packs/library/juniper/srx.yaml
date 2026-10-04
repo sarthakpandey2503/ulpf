@@ -1,0 +1,59 @@
+id: juniper.srx
+version: "1.0"
+vendor: Juniper Networks
+product: SRX Series
+category: firewall
+description: Junos SRX structured syslog (RFC 5424) RT_FLOW session create/close/deny.
+priority: 60
+match:
+  contains: ["RT_FLOW"]
+parse:
+  - {type: syslog, sd_prefix: false}
+mapping:
+  time: {field: syslog_timestamp, cast: timestamp}
+  device.hostname: syslog_host
+  device.type_id: {const: 9}
+  src_endpoint.ip: source-address
+  src_endpoint.port: source-port
+  src_endpoint.zone: source-zone-name
+  src_endpoint.interface_name: packet-incoming-interface
+  dst_endpoint.ip: destination-address
+  dst_endpoint.port: destination-port
+  dst_endpoint.zone: destination-zone-name
+  dst_endpoint.svc_name: service-name
+  connection_info.protocol_num: protocol-id
+  connection_info.protocol_name: {field: protocol-id, map: {"6": tcp, "17": udp, "1": icmp, "58": icmpv6}}
+  connection_info.session.uid: session-id-32
+  firewall_rule.name: policy-name
+  app_name: application
+  actor.user.name: {field: username, map: {"n/a": null}, map_default_passthrough: true}
+  metadata.event_code: syslog_msgid
+classes:
+  - name: session_create
+    when: {field: syslog_msgid, equals: RT_FLOW_SESSION_CREATE}
+    class: network_activity
+    activity_id: {const: 1}
+    mapping:
+      disposition_id: {const: 1}
+      action_id: {const: 1}
+  - name: session_close
+    when: {field: syslog_msgid, equals: RT_FLOW_SESSION_CLOSE}
+    class: network_activity
+    activity_id: {const: 2}
+    mapping:
+      disposition_id: {const: 1}
+      action_id: {const: 1}
+      traffic.bytes_out: bytes-from-client
+      traffic.bytes_in: bytes-from-server
+      traffic.packets_out: packets-from-client
+      traffic.packets_in: packets-from-server
+      duration: {field: elapsed-time, scale: 1000}
+      status_detail: reason
+  - name: session_deny
+    when: {field: syslog_msgid, equals: RT_FLOW_SESSION_DENY}
+    class: network_activity
+    activity_id: {const: 5}
+    mapping:
+      disposition_id: {const: 2}
+      action_id: {const: 2}
+      status_detail: reason

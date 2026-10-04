@@ -1,0 +1,20 @@
+<134>Sep 28 10:21:03 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51234->10.10.20.5:3389, len 60
+<134>Sep 28 10:21:04 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51240->10.10.20.5:3389, len 60
+<134>Sep 28 10:21:09 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:new src-mac 3c:52:82:11:22:33, proto UDP, 198.51.100.7:40211->192.0.2.10:161, len 78
+<134>Sep 28 10:21:11 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:established src-mac 52:54:00:12:34:56, proto TCP (ACK,PSH), 10.10.20.31:49822->93.184.216.34:443, len 1440
+<134>Sep 28 10:21:15 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:invalid src-mac 3c:52:82:11:22:33, proto TCP (RST), 198.51.100.7:40999->192.0.2.10:8291, len 40
+<134>Sep 28 10:21:18 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:new src-mac 52:54:00:aa:bb:cc, proto UDP, 10.10.20.44:53211->8.8.8.8:53, len 71
+<134>Sep 28 10:21:22 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51302->10.10.20.5:22, len 60
+<134>Sep 28 10:21:25 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:new src-mac 3c:52:82:11:22:33, proto ICMP (type 8, code 0), 198.51.100.7->192.0.2.10, len 84
+<134>Sep 28 10:21:31 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:new src-mac 52:54:00:12:34:56, proto TCP (SYN), 10.10.20.31:49901->151.101.1.69:443, len 52
+<134>Sep 28 10:21:36 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51377->10.10.20.5:445, len 60
+<134>Sep 28 10:21:41 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:new src-mac 3c:52:82:11:22:33, proto UDP, 198.51.100.7:40300->192.0.2.10:123, len 76
+<134>Sep 28 10:21:44 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:new src-mac 52:54:00:aa:bb:cc, proto UDP, 10.10.20.44:53999->1.1.1.1:53, len 69
+<134>Sep 28 10:21:50 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51410->10.10.20.6:3389, len 60
+<134>Sep 28 10:21:53 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:established src-mac 52:54:00:12:34:56, proto TCP (ACK), 10.10.20.31:49822->93.184.216.34:443, len 40
+<134>Sep 28 10:21:58 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:new src-mac 3c:52:82:11:22:33, proto TCP (SYN), 198.51.100.7:41022->192.0.2.10:8291, len 60
+<134>Sep 28 10:22:02 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51488->10.10.20.7:3389, len 60
+<134>Sep 28 10:22:06 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:new src-mac 52:54:00:aa:bb:cc, proto UDP, 10.10.20.44:54012->8.8.4.4:53, len 70
+<134>Sep 28 10:22:10 gw-edge-01 firewall,info forward: in:ether1 out:bridge-lan, connection-state:new src-mac 00:0c:29:ab:cd:ef, proto TCP (SYN), 203.0.113.45:51502->10.10.20.8:3389, len 60
+<134>Sep 28 10:22:14 gw-edge-01 firewall,info input: in:ether1 out:(unknown 0), connection-state:new src-mac 3c:52:82:11:22:33, proto UDP, 198.51.100.7:40410->192.0.2.10:161, len 78
+<134>Sep 28 10:22:19 gw-edge-01 firewall,info forward: in:bridge-lan out:ether1, connection-state:new src-mac 52:54:00:12:34:56, proto TCP (SYN), 10.10.20.31:50011->140.82.112.3:443, len 52

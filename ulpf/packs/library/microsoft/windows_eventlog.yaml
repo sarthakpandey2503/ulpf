@@ -1,0 +1,172 @@
+id: microsoft.windows_eventlog
+version: "1.0"
+vendor: Microsoft
+product: Windows EventLog (Sysmon / Security / System / PowerShell)
+category: endpoint
+description: >
+  EDR agent envelope carrying Windows EventLog XML. Field mapping follows the
+  organisation's Sigma -> OCSF convention extracted from the detection rules
+  repository (ulpf/validator/sigma_ocsf_map.json), so existing OCSF rules apply.
+priority: 70
+match:
+  formats: [json]
+  contains: ['"xml"', "<Event"]
+parse:
+  - {type: json}
+  - {type: xml, source: xml, windows_eventdata: true}
+mapping:
+  time:
+    - {field: System.TimeCreated.SystemTime, cast: timestamp}
+    - {field: ts, cast: timestamp}
+  device.hostname: [System.Computer, computer]
+  device.ip: agentIp
+  device.uid: agentId
+  metadata.event_code: System.EventID
+  metadata.log_name: System.Channel
+  metadata.product.feature.name: System.Provider.Name
+  metadata.original_uid: System.EventRecordID
+  actor.user.name: [User, SubjectUserName]
+classes:
+  - name: process_create
+    when: {field: System.EventID, equals: "1"}
+    class: process_activity
+    activity_id: {const: 1}
+    mapping:
+      process.file.path: Image
+      process.file.name: [OriginalFileName, {field: Image, regex: '(?P<v>[^\\]+)$'}]
+      process.cmd_line: CommandLine
+      process.pid: ProcessId
+      process.uid: ProcessGuid
+      process.integrity: IntegrityLevel
+      process.parent_process.file.path: ParentImage
+      process.parent_process.pid: ParentProcessId
+      process.parent_process.cmd_line: ParentCommandLine
+      actor.process.file.path: ParentImage
+      actor.process.pid: ParentProcessId
+  - name: process_access
+    when: {field: System.EventID, in: ["10"]}
+    class: process_activity
+    activity_id: {const: 3}
+    mapping:
+      actor.process.file.path: SourceImage
+      process.file.path: TargetImage
+      process.file.name: {field: TargetImage, regex: '(?P<v>[^\\]+)$'}
+      actual_permissions: GrantedAccess
+  - name: remote_thread
+    when: {field: System.EventID, in: ["8"]}
+    class: process_activity
+    activity_id: {const: 4}
+    mapping:
+      actor.process.file.path: SourceImage
+      process.file.path: TargetImage
+      process.file.name: {field: TargetImage, regex: '(?P<v>[^\\]+)$'}
+  - name: network_connection
+    when: {field: System.EventID, equals: "3"}
+    class: network_activity
+    activity_id: {const: 1}
+    mapping:
+      actor.process.file.path: Image
+      actor.process.pid: ProcessId
+      src_endpoint.ip: SourceIp
+      src_endpoint.port: SourcePort
+      dst_endpoint.ip: DestinationIp
+      dst_endpoint.port: DestinationPort
+      dst_endpoint.hostname: DestinationHostname
+      connection_info.protocol_name: {field: Protocol, cast: lower}
+      connection_info.direction_id: {field: Initiated, map: {"true": 2, "false": 1}, default: 0}
+  - name: image_load
+    when: {field: System.EventID, equals: "7"}
+    class: module_activity
+    activity_id: {const: 1}
+    mapping:
+      actor.process.file.path: Image
+      actor.process.pid: ProcessId
+      module.file.path: ImageLoaded
+      module.file.name: {field: ImageLoaded, regex: '(?P<v>[^\\]+)$'}
+      module.load_type_id: {const: 0}
+  - name: file_create
+    when: {field: System.EventID, in: ["11", "9", "17", "18"]}
+    class: file_activity
+    activity_id: {field: System.EventID, map: {"11": 1, "9": 2, "17": 1, "18": 14}, default: 99}
+    mapping:
+      actor.process.file.path: Image
+      actor.process.pid: ProcessId
+      file.path: [TargetFilename, Device, PipeName]
+      file.name:
+        - {field: TargetFilename, regex: '(?P<v>[^\\]+)$'}
+        - {field: Device, regex: '(?P<v>[^\\]+)$'}
+        - {field: PipeName, regex: '(?P<v>[^\\]+)$'}
+      file.type_id: {field: System.EventID, map: {"17": 6, "18": 6, "11": 1, "9": 99}, default: 0}
+  - name: registry
+    when: {field: System.EventID, in: ["12", "13", "14"]}
+    class: registry_value_activity
+    activity_id: {field: EventType, map: {setvalue: 2, deletevalue: 4, createkey: 2, deletekey: 4, renamekey: 3}, default: 2}
+    mapping:
+      actor.process.file.path: Image
+      actor.process.pid: ProcessId
+      reg_value.path: TargetObject
+      reg_value.name: {field: TargetObject, regex: '(?P<v>[^\\]+)\\?$'}
+      reg_value.data: Details
+  - name: dns_query
+    when: {field: System.EventID, equals: "22"}
+    class: dns_activity
+    activity_id: {const: 1}
+    mapping:
+      actor.process.file.path: Image
+      query.hostname: QueryName
+  - name: logon
+    when: {field: System.EventID, in: ["4624", "4625", "4634", "4648"]}
+    class: authentication
+    activity_id: {field: System.EventID, map: {"4624": 1, "4625": 1, "4648": 1, "4634": 2}, default: 1}
+    mapping:
+      user.name: TargetUserName
+      user.domain: TargetDomainName
+      logon_type_id: LogonType
+      src_endpoint.ip: IpAddress
+      src_endpoint.hostname: WorkstationName
+      auth_protocol: AuthenticationPackageName
+      session.uid: [TargetLogonId, LogonId]
+      logon_process.name: LogonProcessName
+      status_id: {field: System.EventID, map: {"4624": 1, "4625": 2}, default: 0}
+  - name: kerberos
+    when: {field: System.EventID, in: ["4768", "4769", "4770", "4771"]}
+    class: authentication
+    activity_id: {field: System.EventID, map: {"4768": 3, "4769": 4, "4770": 5, "4771": 6}, default: 99}
+    mapping:
+      user.name: TargetUserName
+      user.domain: TargetDomainName
+      service.name: ServiceName
+      src_endpoint.ip: IpAddress
+      auth_protocol: {const: Kerberos}
+  - name: account_change
+    when: {field: System.EventID, in: ["4720", "4722", "4724", "4725", "4726", "4738", "4728", "4732", "4756", "5136"]}
+    class: account_change
+    activity_id: {field: System.EventID, map: {"4720": 1, "4722": 2, "4724": 4, "4725": 5, "4726": 6, "4738": 99, "4728": 7, "4732": 7, "4756": 7, "5136": 99}, default: 99}
+    mapping:
+      user.name: [TargetUserName, ObjectDN]
+      user.domain: TargetDomainName
+  - name: service_install
+    when: {field: System.EventID, in: ["7045", "4697", "7031", "7034", "7036"]}
+    class: win_service_activity
+    activity_id: {field: System.EventID, map: {"7045": 1, "4697": 1, "7036": 3, "7031": 4, "7034": 4}, default: 99}
+    mapping:
+      win_service.name: ServiceName
+      win_service.cmd_line: [ImagePath, ServiceFileName]
+  - name: scheduled_task
+    when: {field: System.EventID, in: ["4698", "4699", "4700", "4701", "4702"]}
+    class: scheduled_job_activity
+    activity_id: {field: System.EventID, map: {"4698": 1, "4699": 3, "4700": 4, "4701": 5, "4702": 2}, default: 99}
+    mapping:
+      job.name: [TaskName, ServiceName]
+  - name: powershell_script
+    when: {field: System.EventID, in: ["4104", "4103", "4688"]}
+    class: process_activity
+    activity_id: {field: System.EventID, map: {"4688": 1}, default: 99}
+    mapping:
+      process.file.path: [Image, NewProcessName]
+      process.file.name: [{field: Image, regex: '(?P<v>[^\\]+)$'}, {field: NewProcessName, regex: '(?P<v>[^\\]+)$'}]
+      process.cmd_line: CommandLine
+      process.pid: ProcessId
+      actor.process.file.path: [ParentImage, Image, ParentProcessName]
+  - name: other
+    class: base_event

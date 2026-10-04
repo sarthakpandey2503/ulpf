@@ -1,0 +1,36 @@
+id: sensors.canonical_alert
+version: "1.0"
+vendor: Multi-sensor
+product: Canonical sensor alert (Wazuh HIDS / Suricata NIDS / Zeek notice)
+category: sensor-alert
+description: >
+  Flat canonical JSON alert used on the replay-events-hids / -nids / -zeek topics
+  of the Detection-Engineering-Ruleset benchmark.
+priority: 66
+match:
+  formats: [json]
+  contains: ['"event_uid"', '"severity_id"']
+parse:
+  - {type: json}
+mapping:
+  time: {field: timestamp, cast: timestamp}
+  device.hostname: hostname
+  device.ip: agent_ip
+  severity_id: severity_id
+classes:
+  - name: alert
+    class: detection_finding
+    activity_id: {const: 1}
+    severity_id: {field: severity_id, default: 3}
+    mapping:
+      finding_info.title: [signature_name, event_type, tactic, auth_category, {const: Unclassified sensor event}]
+      finding_info.uid: event_uid
+      finding_info.attacks[0].tactic.uid: tactic
+      finding_info.types: {field: source, template: "{source}"}
+      actor.process.cmd_line: cmd_line
+      evidences[0].src_endpoint.ip: src_ip
+      evidences[0].src_endpoint.port: src_port
+      evidences[0].dst_endpoint.ip: dst_ip
+      evidences[0].dst_endpoint.port: dst_port
+      evidences[0].connection_info.protocol_name: proto
+      evidences[0].query.hostname: dns_query

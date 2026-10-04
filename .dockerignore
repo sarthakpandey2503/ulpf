@@ -1,0 +1,12 @@
+.venv
+.git
+data
+third_party
+deploy/airgap/bundle
+**/__pycache__
+.pytest_cache
+.hypothesis
+*.key
+*.pem
+tokens.json
+.env

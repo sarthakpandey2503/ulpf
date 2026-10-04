@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+data/
+!data/.gitkeep
+third_party/
+dist/
+build/
+*.egg-info/
+deploy/airgap/bundle/
+deploy/airgap/wheels/
+deploy/secrets/
+# Never commit keys or tokens
+*.key
+*.pem
+tokens.json
+.env

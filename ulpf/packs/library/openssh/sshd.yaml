@@ -1,0 +1,36 @@
+id: openssh.sshd
+version: "1.0"
+vendor: OpenBSD
+product: OpenSSH sshd
+category: bastion
+description: OpenSSH sshd authentication messages from bastion / jump hosts.
+priority: 55
+match:
+  contains: ["sshd["]
+parse:
+  - {type: syslog}
+  - type: grok
+    source: message
+    required: false
+    patterns:
+      - '%{WORD:auth_result} %{WORD:auth_method} for invalid user %{USERNAME:user} from %{IP:src_ip} port %{INT:src_port} %{WORD:ssh_proto}'
+      - '%{WORD:auth_result} %{WORD:auth_method} for %{USERNAME:user} from %{IP:src_ip} port %{INT:src_port} %{WORD:ssh_proto}(?:: %{NOTSPACE:key_type} %{NOTSPACE:key_fingerprint})?'
+      - 'Invalid user %{USERNAME:user} from %{IP:src_ip} port %{INT:src_port}'
+mapping:
+  time: {field: syslog_timestamp, cast: timestamp}
+  device.hostname: syslog_host
+  device.type_id: {const: 1}
+  src_endpoint.ip: src_ip
+  src_endpoint.port: src_port
+  user.name: user
+  auth_protocol: auth_method
+  service.name: {const: sshd}
+  is_remote: {const: true}
+  message: message
+  status_id:
+    - {field: auth_result, map: {accepted: 1, failed: 2}}
+    - {field: message, regex: '^(?P<v>Invalid user)', map: {"invalid user": 2}}
+classes:
+  - name: auth
+    class: authentication
+    activity_id: {const: 1}

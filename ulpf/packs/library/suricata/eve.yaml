@@ -1,0 +1,85 @@
+id: suricata.eve
+version: "1.0"
+vendor: OISF
+product: Suricata
+category: nids
+description: Suricata EVE JSON (alert, dns, http, tls, flow).
+priority: 65
+match:
+  formats: [json]
+  contains: ['"event_type"', '"src_ip"', '"dest_ip"']
+parse:
+  - {type: json}
+mapping:
+  time: {field: timestamp, cast: timestamp}
+  device.type_id: {const: 13}
+  device.interface_name: in_iface
+  src_endpoint.ip: src_ip
+  src_endpoint.port: src_port
+  dst_endpoint.ip: dest_ip
+  dst_endpoint.port: dest_port
+  connection_info.protocol_name: {field: proto, cast: lower}
+  connection_info.uid: flow_id
+  connection_info.community_uid: community_id
+  app_name: app_proto
+  traffic.bytes_out: flow.bytes_toserver
+  traffic.bytes_in: flow.bytes_toclient
+  traffic.packets_out: flow.pkts_toserver
+  traffic.packets_in: flow.pkts_toclient
+classes:
+  - name: alert
+    when: {field: event_type, equals: alert}
+    class: detection_finding
+    activity_id: {const: 1}
+    severity_id: {field: alert.severity, map: {"1": 4, "2": 3, "3": 2, "4": 1}, default: 3}
+    mapping:
+      finding_info.title: alert.signature
+      finding_info.uid: {field: [alert.gid, alert.signature_id, alert.rev], join: ":"}
+      finding_info.types: {field: alert.category, template: "{alert.category}"}
+      disposition_id: {field: alert.action, map: {allowed: 15, blocked: 2}, default: 0}
+      action_id: {field: alert.action, map: {allowed: 3, blocked: 2}, default: 0}
+      evidences[0].src_endpoint.ip: src_ip
+      evidences[0].src_endpoint.port: src_port
+      evidences[0].dst_endpoint.ip: dest_ip
+      evidences[0].dst_endpoint.port: dest_port
+  - name: dns
+    when: {field: event_type, equals: dns}
+    class: dns_activity
+    activity_id: {field: dns.type, map: {query: 1, answer: 2}, default: 6}
+    mapping:
+      query.hostname: dns.rrname
+      query.type: dns.rrtype
+      query.packet_uid: dns.id
+      rcode: dns.rcode
+  - name: http
+    when: {field: event_type, equals: http}
+    class: http_activity
+    activity_id: {field: http.http_method, map: {connect: 1, delete: 2, get: 3, head: 4, options: 5, post: 6, put: 7, trace: 8}, default: 99}
+    mapping:
+      http_request.http_method: http.http_method
+      http_request.url.hostname: http.hostname
+      http_request.url.path: http.url
+      http_request.url.url_string: {template: "http://{http.hostname}{http.url}"}
+      http_request.user_agent: http.http_user_agent
+      http_request.version: http.protocol
+      http_response.code: http.status
+      http_response.length: http.length
+      http_response.content_type: http.http_content_type
+  - name: tls
+    when: {field: event_type, equals: tls}
+    class: network_activity
+    activity_id: {const: 6}
+    mapping:
+      tls.sni: tls.sni
+      tls.version: tls.version
+      dst_endpoint.hostname: tls.sni
+      tls.ja3_hash.value: tls.ja3.hash
+      tls.ja3_hash.algorithm_id: {const: 99}
+  - name: flow
+    class: network_activity
+    activity_id: {field: flow.state, map: {new: 1, established: 6, closed: 2}, default: 6}
+    mapping:
+      start_time: {field: flow.start, cast: timestamp}
+      end_time: {field: flow.end, cast: timestamp}
+      duration: {field: flow.age, scale: 1000}
+      status_detail: flow.reason

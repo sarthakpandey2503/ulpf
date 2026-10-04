@@ -1,0 +1,2 @@
+CEF:0|Imperva Inc.|SecureSphere|14.7|SQL Injection|SQL Injection Attempt|9|act=Block rt=1790581502000 src=198.51.100.23 spt=40022 dst=10.20.5.8 dpt=443 proto=TCP suser=- request=https://portal.corp.example/search?q=1%27%20OR%201%3D1 requestMethod=GET cs1Label=Policy cs1=Web SQL Injection
+CEF:0|Zscaler|NSSWeblog|6.1|Blocked|URL Filtering|5|act=Blocked rt=1790581510000 src=10.60.1.22 dst=104.16.10.10 suser=priya@corp.example request=https://mega.nz/file/abc requestMethod=GET requestClientApplication=Mozilla/5.0 cat=File Host out=1200 in=0

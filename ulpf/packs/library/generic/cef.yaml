@@ -1,0 +1,55 @@
+id: generic.cef
+version: "1.0"
+vendor: Generic
+product: CEF producer
+category: any
+description: Standard CEF dictionary keys (ArcSight CEF 25) for any CEF-emitting device without a dedicated pack.
+priority: 10
+match:
+  formats: [cef]
+parse:
+  - {type: syslog, required: false}
+  - {type: cef, source: message, when: {field: message, contains: "CEF:"}}
+  - {type: cef, when: {field: device_vendor, exists: false}, required: false}
+mapping:
+  time: {field: rt, cast: timestamp}
+  metadata.product.vendor_name: device_vendor
+  metadata.product.name: device_product
+  metadata.product.version: device_version
+  device.hostname: [dvchost, syslog_host]
+  device.ip: dvc
+  src_endpoint.ip: src
+  src_endpoint.port: spt
+  src_endpoint.hostname: shost
+  src_endpoint.mac: smac
+  dst_endpoint.ip: dst
+  dst_endpoint.port: dpt
+  dst_endpoint.hostname: dhost
+  dst_endpoint.mac: dmac
+  connection_info.protocol_name: {field: proto, cast: lower}
+  actor.user.name: {field: suser, map: {"-": null}, map_default_passthrough: true}
+  message: msg
+  traffic.bytes_out: out
+  traffic.bytes_in: in
+severity_id:
+  field: severity
+  map: {"0": 1, "1": 1, "2": 1, "3": 2, "4": 2, "5": 3, "6": 3, "7": 4, "8": 4, "9": 5, "10": 5, low: 2, medium: 3, high: 4, very-high: 5}
+  default: 1
+classes:
+  - name: web
+    when: {field: request, exists: true}
+    class: network_activity
+    activity_id: {const: 6}
+    mapping:
+      url.url_string: request
+      url.hostname: {field: request, regex: '^(?:[a-z]+://)?(?P<v>[^/:?]+)'}
+      url.categories: {field: cat, template: "{cat}"}
+      disposition_id: {field: act, map: {block: 2, blocked: 2, deny: 2, allow: 1, allowed: 1, alert: 19}, default: 0}
+      action_id: {field: act, map: {block: 2, blocked: 2, deny: 2, allow: 1, allowed: 1}, default: 0}
+      status_detail: name
+  - name: network
+    class: network_activity
+    activity_id: {const: 6}
+    mapping:
+      disposition_id: {field: act, map: {block: 2, blocked: 2, deny: 2, drop: 6, allow: 1, allowed: 1, accept: 1}, default: 0}
+      action_id: {field: act, map: {block: 2, blocked: 2, deny: 2, drop: 2, allow: 1, allowed: 1, accept: 1}, default: 0}

@@ -1,0 +1,62 @@
+id: checkpoint.cef
+version: "1.0"
+vendor: Check Point
+product: Quantum Security Gateway
+category: firewall
+description: Check Point Log Exporter in CEF (Firewall, IPS/SmartDefense, Anti-Bot, Threat Emulation).
+priority: 70
+match:
+  formats: [cef]
+  contains: ["|Check Point|"]
+parse:
+  - {type: syslog, required: false}
+  - {type: cef, source: message, when: {field: message, contains: "CEF:"}}
+  - {type: cef, when: {field: device_vendor, exists: false}, required: false}
+mapping:
+  time: {field: rt, cast: timestamp}
+  device.hostname: [dvchost, syslog_host]
+  device.ip: origin
+  device.type_id: {const: 9}
+  src_endpoint.ip: src
+  src_endpoint.port: spt
+  dst_endpoint.ip: dst
+  dst_endpoint.port: dpt
+  src_endpoint.interface_name: deviceInboundInterface
+  dst_endpoint.interface_name: deviceOutboundInterface
+  connection_info.protocol_num: proto
+  connection_info.protocol_name: {field: proto, map: {"6": tcp, "17": udp, "1": icmp}}
+  connection_info.direction_id: {field: deviceDirection, map: {"0": 1, "1": 2}, default: 0}
+  actor.user.name: suser
+  message: msg
+  metadata.product.name: device_product
+severity_id:
+  field: severity
+  map: {"0": 1, "1": 1, "2": 1, "3": 2, "4": 2, "5": 3, "6": 3, "7": 4, "8": 4, "9": 5, "10": 5}
+  default: 1
+classes:
+  - name: threat
+    when: {field: device_product, in: [Anti-Bot, Anti-Virus, SmartDefense, IPS, Threat Emulation, Threat Extraction, URL Filtering]}
+    class: detection_finding
+    activity_id: {const: 1}
+    mapping:
+      finding_info.title: [cs1, name]
+      finding_info.uid: {field: [device_product, cs1], join: ":"}
+      finding_info.types: {field: cs3, template: "{cs3}"}
+      malware[0].name: cs4
+      malware[0].classification_ids: {field: cs4, const: [0]}
+      disposition_id: {field: act, map: {prevent: 2, drop: 6, block: 2, detect: 15, accept: 1, ask: 23, inform: 17}, default: 0}
+      action_id: {field: act, map: {prevent: 2, drop: 2, block: 2, detect: 3, accept: 1}, default: 0}
+      evidences[0].src_endpoint.ip: src
+      evidences[0].src_endpoint.port: spt
+      evidences[0].dst_endpoint.ip: dst
+      evidences[0].dst_endpoint.port: dpt
+      evidences[0].url.url_string: request
+  - name: firewall
+    class: network_activity
+    activity_id: {field: act, map: {accept: 6, drop: 5, reject: 5}, default: 6}
+    mapping:
+      firewall_rule.name: {field: cs2, when: {field: cs2Label, equals: Rule Name}}
+      disposition_id: {field: act, map: {accept: 1, drop: 6, reject: 25, block: 2}, default: 0}
+      action_id: {field: act, map: {accept: 1, drop: 2, reject: 2, block: 2}, default: 0}
+      traffic.bytes_out: out
+      traffic.bytes_in: in

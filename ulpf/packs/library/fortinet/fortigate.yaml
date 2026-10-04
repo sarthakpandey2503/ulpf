@@ -1,0 +1,110 @@
+id: fortinet.fortigate
+version: "1.0"
+vendor: Fortinet
+product: FortiGate
+category: firewall
+description: FortiGate FortiOS key=value syslog (traffic, UTM/IPS, webfilter, VPN events).
+priority: 60
+match:
+  formats: [kv]
+  contains: ["devid=", "logid="]
+parse:
+  - {type: syslog}
+  - {type: kv, source: message}
+mapping:
+  time:
+    - {field: eventtime, cast: timestamp}
+    - {field: [date, time], join: " ", cast: timestamp, format: "%Y-%m-%d %H:%M:%S"}
+  device.hostname: devname
+  device.uid: devid
+  device.type_id: {const: 9}
+  src_endpoint.ip: srcip
+  src_endpoint.port: srcport
+  src_endpoint.interface_name: srcintf
+  src_endpoint.zone: srcintfrole
+  src_endpoint.location.country: srccountry
+  dst_endpoint.ip: dstip
+  dst_endpoint.port: dstport
+  dst_endpoint.interface_name: dstintf
+  dst_endpoint.zone: dstintfrole
+  dst_endpoint.location.country: dstcountry
+  dst_endpoint.svc_name: service
+  connection_info.protocol_num: proto
+  connection_info.protocol_name:
+    field: proto
+    map: {"6": tcp, "17": udp, "1": icmp, "58": icmpv6, "47": gre, "50": esp}
+  connection_info.session.uid: sessionid
+  firewall_rule.uid: policyid
+  message: [msg, logdesc]
+  actor.user.name: user
+severity_id:
+  field: level
+  map: {emergency: 6, alert: 5, critical: 5, error: 4, warning: 3, notice: 2, information: 1, debug: 1}
+  default: 1
+classes:
+  - name: traffic
+    when: {field: type, equals: traffic}
+    class: network_activity
+    activity_id:
+      field: action
+      map: {accept: 6, close: 2, client-rst: 3, server-rst: 3, timeout: 2, deny: 5, ip-conn: 4}
+      default: 6
+    mapping:
+      disposition_id:
+        field: action
+        map: {accept: 1, close: 1, timeout: 1, client-rst: 1, server-rst: 1, deny: 2, ip-conn: 2}
+        default: 0
+      action_id: {field: action, map: {accept: 1, close: 1, timeout: 1, deny: 2, ip-conn: 2}, default: 0}
+      traffic.bytes_out: sentbyte
+      traffic.bytes_in: rcvdbyte
+      traffic.packets_out: sentpkt
+      traffic.packets_in: rcvdpkt
+      duration: {field: duration, scale: 1000}
+  - name: ips
+    when: {all: [{field: type, equals: utm}, {field: subtype, in: [ips, anomaly, virus, app-ctrl]}]}
+    class: detection_finding
+    activity_id: {const: 1}
+    severity_id:
+      field: severity
+      map: {info: 1, low: 2, medium: 3, high: 4, critical: 5}
+      default: 3
+    mapping:
+      finding_info.title: [attack, virus, app, msg]
+      finding_info.uid: [attackid, incidentserialno, logid]
+      finding_info.types: {field: subtype, template: "{subtype}"}
+      finding_info.src_url: ref
+      disposition_id: {field: action, map: {dropped: 6, blocked: 2, reset: 21, detected: 15, pass: 1, monitored: 17}, default: 0}
+      action_id: {field: action, map: {dropped: 2, blocked: 2, reset: 2, pass: 1, detected: 3, monitored: 3}, default: 0}
+      evidences[0].src_endpoint.ip: srcip
+      evidences[0].src_endpoint.port: srcport
+      evidences[0].dst_endpoint.ip: dstip
+      evidences[0].dst_endpoint.port: dstport
+      evidences[0].dst_endpoint.hostname: hostname
+      evidences[0].url.url_string: url
+  - name: webfilter
+    when: {all: [{field: type, equals: utm}, {field: subtype, equals: webfilter}]}
+    class: network_activity
+    activity_id: {const: 6}
+    mapping:
+      url.url_string: url
+      url.hostname: hostname
+      url.categories: {field: catdesc, template: "{catdesc}"}
+      disposition_id: {field: action, map: {passthrough: 1, blocked: 2, monitored: 17}, default: 0}
+      action_id: {field: action, map: {passthrough: 1, blocked: 2}, default: 0}
+      traffic.bytes_out: sentbyte
+      traffic.bytes_in: rcvdbyte
+  - name: vpn_auth
+    when: {all: [{field: type, equals: event}, {field: subtype, equals: vpn}]}
+    class: authentication
+    activity_id: {field: action, map: {tunnel-down: 2, ssl-logout: 2}, default: 1}
+    mapping:
+      user.name: user
+      src_endpoint.ip: remip
+      status_id: {field: action, map: {ssl-login-fail: 2, tunnel-up: 1, ssl-new-con: 1, tunnel-down: 1}, default: 0}
+      status_detail: reason
+      auth_protocol: tunneltype
+      is_remote: {const: true}
+      session.uid: tunnelid
+  - name: other
+    class: network_activity
+    activity_id: {const: 99}

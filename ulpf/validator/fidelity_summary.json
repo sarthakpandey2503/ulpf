@@ -1,0 +1,166 @@
+{
+ "generated_ms": 1790678734570,
+ "ocsf_version": "1.3.0",
+ "datasets_found": 551,
+ "rules_evaluated": 539,
+ "cases_evaluated": 2156,
+ "twin_rules_used": 453,
+ "pysigma_lint_errors": 3,
+ "oracle_agreement": 94.81,
+ "schema_fidelity_score": 100.0,
+ "native_ocsf_fidelity": 91.0,
+ "rules_fully_preserved": 539,
+ "modes": {
+  "native": {
+   "fidelity_vs_raw": 91.0,
+   "fidelity_on_valid_oracle": 91.1,
+   "accuracy_vs_expected": 86.92,
+   "tp_detection_rate": 79.59,
+   "benign_silence_rate": 94.25,
+   "detections_lost": 174,
+   "false_alerts_introduced": 20,
+   "field_resolution": {
+    "native": 2044,
+    "absent": 1150,
+    "alias": 2825,
+    "lost": 345
+   },
+   "ocsf_native_share": 100.0,
+   "top_lost_fields": [
+    [
+     "unmapped.script_block_text",
+     129
+    ],
+    [
+     "SourceImage",
+     30
+    ],
+    [
+     "unmapped.event_type",
+     30
+    ],
+    [
+     "http_request_path",
+     15
+    ],
+    [
+     "unmapped.parent_image",
+     13
+    ],
+    [
+     "dst_endpoint.port",
+     12
+    ],
+    [
+     "destination_domain",
+     12
+    ],
+    [
+     "TargetDomainName",
+     10
+    ],
+    [
+     "ScriptBlockText",
+     9
+    ],
+    [
+     "process.file.path",
+     8
+    ],
+    [
+     "subject",
+     8
+    ],
+    [
+     "Description",
+     6
+    ]
+   ]
+  },
+  "full": {
+   "fidelity_vs_raw": 100.0,
+   "fidelity_on_valid_oracle": 100.0,
+   "accuracy_vs_expected": 94.81,
+   "tp_detection_rate": 94.62,
+   "benign_silence_rate": 94.99,
+   "detections_lost": 0,
+   "false_alerts_introduced": 0,
+   "field_resolution": {
+    "native": 2045,
+    "absent": 1145,
+    "alias": 2833,
+    "unmapped": 389,
+    "lineage": 46,
+    "lost": 1
+   },
+   "ocsf_native_share": 91.81,
+   "top_lost_fields": [
+    [
+     "src_ip",
+     1
+    ]
+   ]
+  }
+ },
+ "by_format": {
+  "sigma": {
+   "cases": 1884,
+   "preserved_full": 1884,
+   "preserved_native": 1690,
+   "oracle_ok": 1827
+  },
+  "legacy": {
+   "cases": 196,
+   "preserved_full": 196,
+   "preserved_native": 196,
+   "oracle_ok": 157
+  },
+  "IR_v1": {
+   "cases": 76,
+   "preserved_full": 76,
+   "preserved_native": 76,
+   "oracle_ok": 60
+  }
+ },
+ "schema_drift_in_third_party_rules": [
+  [
+   "registry_key_activity:registry.key",
+   41
+  ],
+  [
+   "network_activity:process.file.path",
+   33
+  ],
+  [
+   "file_activity:process.file.path",
+   25
+  ],
+  [
+   "registry_key_activity:process.file.path",
+   11
+  ],
+  [
+   "driver_activity (not an OCSF 1.3.0 class)",
+   10
+  ],
+  [
+   "registry_key_activity:registry.data.content",
+   6
+  ],
+  [
+   "network_activity:process.cmd_line",
+   2
+  ]
+ ],
+ "seconds": 4.7,
+ "pysigma_findings_by_type": [
+  [
+   "EscapedWildcardIssue",
+   2
+  ],
+  [
+   "WildcardInsteadOfEndswithIssue",
+   2
+  ]
+ ]
+}

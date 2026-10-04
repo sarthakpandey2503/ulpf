@@ -1,0 +1,79 @@
+id: zeek.json
+version: "1.0"
+vendor: Zeek Project
+product: Zeek
+category: nsm
+description: Zeek JSON logs (conn, dns, http, ssh, notice). Uses _path when present, else field shape.
+priority: 65
+match:
+  formats: [json]
+  any_contains: ['"id.orig_h"', '"_path"']
+parse:
+  - {type: json}
+mapping:
+  time: {field: ts, cast: timestamp}
+  device.type_id: {const: 13}
+  src_endpoint.ip: [id.orig_h, src]
+  src_endpoint.port: id.orig_p
+  dst_endpoint.ip: [id.resp_h, dst]
+  dst_endpoint.port: id.resp_p
+  connection_info.protocol_name: proto
+  connection_info.uid: {field: uid, map: {"-": null}, map_default_passthrough: true}
+classes:
+  - name: conn
+    when: {any: [{field: _path, equals: conn}, {field: conn_state, exists: true}]}
+    class: network_activity
+    activity_id: {field: conn_state, map: {S0: 4, REJ: 5, RSTO: 3, RSTR: 3, SF: 2}, default: 6}
+    mapping:
+      app_name: service
+      duration: {field: duration, scale: 1000}
+      traffic.bytes_out: orig_bytes
+      traffic.bytes_in: resp_bytes
+      traffic.packets_out: orig_pkts
+      traffic.packets_in: resp_pkts
+      status_detail: conn_state
+  - name: dns
+    when: {any: [{field: _path, equals: dns}, {field: qtype_name, exists: true}]}
+    class: dns_activity
+    activity_id: {const: 2}
+    mapping:
+      query.hostname: query
+      query.type: qtype_name
+      query.class: qclass_name
+      query.packet_uid: trans_id
+      rcode: rcode_name
+  - name: http
+    when: {any: [{field: _path, equals: http}, {field: method, exists: true}]}
+    class: http_activity
+    activity_id: {field: method, map: {connect: 1, delete: 2, get: 3, head: 4, options: 5, post: 6, put: 7, trace: 8}, default: 99}
+    mapping:
+      http_request.http_method: method
+      http_request.url.hostname: host
+      http_request.url.path: uri
+      http_request.url.url_string: {template: "http://{host}{uri}"}
+      http_request.user_agent: user_agent
+      http_request.length: request_body_len
+      http_response.code: status_code
+      http_response.message: status_msg
+      http_response.length: response_body_len
+  - name: ssh
+    when: {any: [{field: _path, equals: ssh}, {field: auth_attempts, exists: true}]}
+    class: ssh_activity
+    activity_id: {const: 1}
+    mapping:
+      protocol_ver: version
+      status_id: {field: auth_success, map: {"true": 1, "false": 2}, default: 0}
+  - name: notice
+    when: {any: [{field: _path, equals: notice}, {field: note, exists: true}]}
+    class: detection_finding
+    activity_id: {const: 1}
+    severity_id: {const: 3}
+    mapping:
+      finding_info.title: note
+      finding_info.uid: {field: note, template: "zeek:{note}"}
+      message: msg
+      evidences[0].src_endpoint.ip: src
+      evidences[0].dst_endpoint.ip: dst
+  - name: other
+    class: network_activity
+    activity_id: {const: 99}

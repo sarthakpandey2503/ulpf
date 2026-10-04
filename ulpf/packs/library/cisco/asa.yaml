@@ -1,0 +1,88 @@
+id: cisco.asa
+version: "1.0"
+vendor: Cisco
+product: ASA
+category: firewall
+description: Cisco ASA / FTD syslog (%ASA-level-msgid) connection, ACL, AAA and AnyConnect messages.
+priority: 60
+match:
+  contains: ["%ASA-"]
+parse:
+  - {type: syslog}
+  - {type: regex, source: syslog_app, pattern: '^%(?:ASA|FTD)-(?P<asa_level>\d)-(?P<asa_msgid>\d+)$'}
+  - type: grok
+    source: message
+    required: false
+    patterns:
+      - '%{WORD:asa_action} %{WORD:direction} %{WORD:protocol} connection %{INT:connection_id} for %{NOTSPACE:src_zone}:%{IP:src_ip}/%{INT:src_port} \(%{IP:src_mapped_ip}/%{INT:src_mapped_port}\) to %{NOTSPACE:dst_zone}:%{IP:dst_ip}/%{INT:dst_port} \(%{IP:dst_mapped_ip}/%{INT:dst_mapped_port}\)'
+      - '%{WORD:asa_action} %{WORD:protocol} connection %{INT:connection_id} for %{NOTSPACE:src_zone}:%{IP:src_ip}/%{INT:src_port} to %{NOTSPACE:dst_zone}:%{IP:dst_ip}/%{INT:dst_port} duration %{NOTSPACE:duration_hms} bytes %{INT:bytes}%{GREEDYDATA:teardown_reason}'
+      - '%{WORD:asa_action} %{WORD:protocol} src %{NOTSPACE:src_zone}:%{IP:src_ip}/%{INT:src_port} dst %{NOTSPACE:dst_zone}:%{IP:dst_ip}/%{INT:dst_port} by access-group %{QS:acl}'
+      - 'AAA user authentication %{WORD:auth_result} : reason = %{DATA:auth_reason} : server = %{IP:auth_server} : user = %{USERNAME:user} : user IP = %{IP:src_ip}'
+      - 'AAA user authentication %{WORD:auth_result} : server = %{IP:auth_server} : user = %{USERNAME:user}'
+      - 'Group <%{DATA:vpn_group}> User <%{DATA:user}> IP <%{IP:src_ip}> IPv4 Address <%{IP:assigned_ip}>%{GREEDYDATA:vpn_detail}'
+mapping:
+  time: {field: syslog_timestamp, cast: timestamp}
+  device.hostname: syslog_host
+  device.type_id: {const: 9}
+  src_endpoint.ip: src_ip
+  src_endpoint.port: src_port
+  src_endpoint.zone: src_zone
+  dst_endpoint.ip: dst_ip
+  dst_endpoint.port: dst_port
+  dst_endpoint.zone: dst_zone
+  connection_info.protocol_name: {field: protocol, cast: lower}
+  connection_info.uid: connection_id
+  connection_info.direction_id: {field: direction, map: {inbound: 1, outbound: 2}, default: 0}
+  message: message
+  metadata.event_code: asa_msgid
+severity_id:
+  field: asa_level
+  map: {"0": 6, "1": 5, "2": 5, "3": 4, "4": 3, "5": 2, "6": 1, "7": 1}
+  default: 1
+classes:
+  - name: connection
+    when: {field: asa_msgid, in: ["302013", "302014", "302015", "302016", "302020", "302021"]}
+    class: network_activity
+    activity_id: {field: asa_action, map: {built: 1, teardown: 2}, default: 6}
+    mapping:
+      disposition_id: {const: 1}
+      action_id: {const: 1}
+      traffic.bytes: bytes
+      status_detail: {field: teardown_reason, regex: '^\s*(?P<v>.+)$'}
+  - name: acl_deny
+    when: {field: asa_msgid, in: ["106001", "106006", "106007", "106014", "106015", "106021", "106023", "106100", "710003"]}
+    class: network_activity
+    activity_id: {const: 5}
+    mapping:
+      disposition_id: {const: 2}
+      action_id: {const: 2}
+      firewall_rule.name: {field: acl, regex: '^"(?P<v>[^"]*)"$'}
+  - name: aaa
+    when: {field: asa_msgid, in: ["113004", "113005", "113012", "113015", "113019", "611101", "611102"]}
+    class: authentication
+    activity_id: {const: 1}
+    mapping:
+      user.name: user
+      status_id: {field: auth_result, map: {successful: 1, rejected: 2, failed: 2}, default: 0}
+      status_detail: auth_reason
+      dst_endpoint.ip: auth_server
+  - name: anyconnect
+    when: {field: asa_msgid, in: ["722051", "722022", "722023", "722037", "113039"]}
+    class: authentication
+    activity_id: {const: 1}
+    mapping:
+      user.name: user
+      status_id: {const: 1}
+      is_remote: {const: true}
+      auth_protocol: {const: AnyConnect}
+      message: message
+  - name: threat_detection
+    when: {field: asa_msgid, in: ["733100", "733101", "733102", "400000", "400013"]}
+    class: detection_finding
+    activity_id: {const: 1}
+    mapping:
+      finding_info.title: {field: message, regex: '^\[\s*(?P<v>[^\]]+)\]'}
+      finding_info.uid: asa_msgid
+  - name: other
+    class: network_activity
+    activity_id: {const: 99}

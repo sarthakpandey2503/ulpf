@@ -1,0 +1,41 @@
+id: pfsense.filterlog
+version: "1.0"
+vendor: Netgate
+product: pfSense / OPNsense
+category: firewall
+description: pf filterlog CSV (IPv4 TCP/UDP/ICMP).
+priority: 60
+match:
+  contains: ["filterlog"]
+parse:
+  - {type: syslog}
+  - type: csv
+    source: message
+    columns_by:
+      index: 16
+      map:
+        tcp: [rule_number, sub_rule, anchor, tracker, interface, reason, action, direction, ip_version, tos, ecn, ttl, ip_id, offset, ip_flags, proto_id, proto, length, src_ip, dst_ip, src_port, dst_port, data_length, tcp_flags, seq, ack, window, urg, tcp_options]
+        udp: [rule_number, sub_rule, anchor, tracker, interface, reason, action, direction, ip_version, tos, ecn, ttl, ip_id, offset, ip_flags, proto_id, proto, length, src_ip, dst_ip, src_port, dst_port, data_length]
+        default: [rule_number, sub_rule, anchor, tracker, interface, reason, action, direction, ip_version, tos, ecn, ttl, ip_id, offset, ip_flags, proto_id, proto, length, src_ip, dst_ip]
+mapping:
+  time: {field: syslog_timestamp, cast: timestamp}
+  device.hostname: syslog_host
+  device.type_id: {const: 9}
+  src_endpoint.ip: src_ip
+  src_endpoint.port: src_port
+  dst_endpoint.ip: dst_ip
+  dst_endpoint.port: dst_port
+  src_endpoint.interface_name: interface
+  connection_info.protocol_name: {field: proto, cast: lower}
+  connection_info.protocol_num: proto_id
+  connection_info.direction_id: {field: direction, map: {in: 1, out: 2}, default: 0}
+  connection_info.tcp_flags: {field: tcp_flags, map: {S: 2, SA: 18, A: 16, F: 1, FA: 17, R: 4, RA: 20, PA: 24}}
+  firewall_rule.uid: tracker
+  firewall_rule.name: rule_number
+  traffic.bytes: length
+  disposition_id: {field: action, map: {pass: 1, block: 2, reject: 25}, default: 0}
+  action_id: {field: action, map: {pass: 1, block: 2, reject: 2}, default: 0}
+classes:
+  - name: filter
+    class: network_activity
+    activity_id: {field: action, map: {pass: 6, block: 5, reject: 5}, default: 6}

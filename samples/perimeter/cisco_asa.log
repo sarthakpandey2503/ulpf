@@ -1,0 +1,8 @@
+<166>Sep 28 2026 10:15:02 ASA-EDGE-01 : %ASA-6-302013: Built outbound TCP connection 447781 for outside:93.184.216.34/443 (93.184.216.34/443) to inside:10.30.1.25/50123 (203.0.113.30/50123)
+<166>Sep 28 2026 10:15:32 ASA-EDGE-01 : %ASA-6-302014: Teardown TCP connection 447781 for outside:93.184.216.34/443 to inside:10.30.1.25/50123 duration 0:00:30 bytes 5623 TCP FINs
+<164>Sep 28 2026 10:15:05 ASA-EDGE-01 : %ASA-4-106023: Deny tcp src outside:198.51.100.77/44321 dst inside:10.30.1.10/3389 by access-group "outside_access_in" [0x0, 0x0]
+<166>Sep 28 2026 10:15:40 ASA-EDGE-01 : %ASA-6-302015: Built inbound UDP connection 447790 for outside:203.0.113.99/53211 (203.0.113.99/53211) to dmz:10.30.5.53/53 (203.0.113.53/53)
+<166>Sep 28 2026 10:16:02 ASA-EDGE-01 : %ASA-6-113004: AAA user authentication Successful : server = 10.30.0.5 : user = bob
+<165>Sep 28 2026 10:16:15 ASA-EDGE-01 : %ASA-5-113005: AAA user authentication Rejected : reason = AAA failure : server = 10.30.0.5 : user = administrator : user IP = 198.51.100.200
+<166>Sep 28 2026 10:16:40 ASA-EDGE-01 : %ASA-6-722051: Group <GroupPolicy_VPN> User <carol> IP <198.51.100.23> IPv4 Address <10.99.0.12> IPv6 address <::> assigned to session
+<164>Sep 28 2026 10:17:00 ASA-EDGE-01 : %ASA-4-733100: [ Scanning] drop rate-1 exceeded. Current burst rate is 12 per second, max configured rate is 10; Current average rate is 9 per second, max configured rate is 5; Cumulative total count is 5500
