@@ -1,0 +1,6 @@
+ts=2026-10-05T09:12:01Z fw=edge-gw01 action=allow proto=tcp src_ip=10.1.4.22 src_port=51544 dst_ip=142.250.183.14 dst_port=443 bytes_out=2214 bytes_in=8120 rule=web-out
+ts=2026-10-05T09:12:03Z fw=edge-gw01 action=deny proto=tcp src_ip=185.220.101.4 src_port=44512 dst_ip=10.1.4.2 dst_port=3389 bytes_out=60 bytes_in=0 rule=default-deny
+ts=2026-10-05T09:12:07Z fw=edge-gw01 action=allow proto=udp src_ip=10.1.4.15 src_port=53001 dst_ip=8.8.8.8 dst_port=53 bytes_out=74 bytes_in=190 rule=dns-out
+ts=2026-10-05T09:12:11Z fw=edge-gw01 action=deny proto=tcp src_ip=45.155.205.99 src_port=40022 dst_ip=10.1.4.3 dst_port=22 bytes_out=60 bytes_in=0 rule=default-deny
+ts=2026-10-05T09:12:15Z fw=edge-gw01 action=allow proto=tcp src_ip=10.1.4.44 src_port=51022 dst_ip=20.190.160.1 dst_port=443 bytes_out=18230 bytes_in=90211 rule=web-out
+ts=2026-10-05T09:12:19Z fw=edge-gw01 action=deny proto=udp src_ip=91.240.118.7 src_port=5060 dst_ip=10.1.4.2 dst_port=5060 bytes_out=412 bytes_in=0 rule=default-deny

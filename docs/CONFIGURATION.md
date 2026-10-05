@@ -2,6 +2,10 @@
 
 All settings are read from environment variables prefixed `ULPF_`. Defined in `ulpf/config.py` as the `Settings` dataclass. A module-level `settings = Settings()` is constructed at import; the CLI and tests usually construct a fresh `Settings()` after setting env vars.
 
+## `.env` file
+
+At import, `ulpf/config.py` calls `load_dotenv()`, which reads `<repo>/.env` if it exists. Only `ULPF_*` names are applied, and only when the variable is not already set, so shell exports, Docker, and Compose still win. Lines may use `export `, `#` comments, and quoted values. Start from the committed sample: `copy .env.example .env` (PowerShell) or `cp .env.example .env`. `.env` is gitignored.
+
 `Settings.ensure_dirs()` creates `data_dir`, `drafts_dir`, `approved_dir`, `keys_dir`, then `chmod 0700` on `keys_dir` (silently skipped if that fails — typical on Windows).
 
 ## Variables
@@ -32,7 +36,11 @@ All settings are read from environment variables prefixed `ULPF_`. Defined in `u
 | `ULPF_TLS_VERIFY` | `true` | TLS checks for Splunk and Elastic. **Not** passed to ClickHouse |
 | `ULPF_OLLAMA_URL` | `http://localhost:11434` | Local LLM. Compose does not override this, so the `ollama` service is unused |
 | `ULPF_OLLAMA_MODEL` | `qwen2.5-coder:7b` | Model name |
-| `ULPF_OLLAMA_ALLOWED_HOSTS` | `localhost,127.0.0.1,::1,ollama` | Hostname allow-list (hostname only, not scheme/port) |
+| `ULPF_OLLAMA_ALLOWED_HOSTS` | `localhost,127.0.0.1,::1,ollama` | Hostname allow-list (hostname only, not scheme/port). Also applies to the LM Studio URL |
+| `ULPF_LMSTUDIO_API_KEY` | empty | When non-empty, the parser generator uses LM Studio instead of Ollama. Also read from `ULPF_LMSTUDIO_API_KEY_FILE` |
+| `ULPF_LMSTUDIO_URL` | `http://127.0.0.1:1234/v1` | LM Studio OpenAI-compatible base URL |
+| `ULPF_LMSTUDIO_MODEL` | empty | LM Studio model id. Required when the key is set |
+| `ULPF_LMSTUDIO_REASONING_EFFORT` | `none` | Sent as `reasoning_effort`. `none` stops thinking models from spending the token budget on hidden reasoning. Empty omits the field |
 | `ULPF_TOKENS_FILE` | `<repo>/data/tokens.json` | API tokens. Compose: `/run/secrets/ulpf_tokens` |
 | `ULPF_CORS_ORIGINS` | empty | Parsed into a list. **No CORS middleware uses it** |
 | `ULPF_UI_DIR` | `<repo>/ui` | Dashboard files. Docker: `/opt/ulpf/ui` |
@@ -54,6 +62,7 @@ Boolean flags compare `.lower() == "true"` except `TLS_VERIFY`, which is true un
 | `ELASTIC_API_KEY` | |
 | `S3_ACCESS_KEY` | MinIO root user in Compose |
 | `S3_SECRET_KEY` | MinIO root password in Compose |
+| `LMSTUDIO_API_KEY` | |
 
 API tokens are **not** in this helper; they use `ULPF_TOKENS_FILE` as a JSON document of hashes.
 

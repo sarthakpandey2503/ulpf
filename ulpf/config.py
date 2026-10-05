@@ -1,5 +1,8 @@
 """Runtime configuration, read from ``ULPF_*`` environment variables.
 
+A ``.env`` file in the project root, if present, fills in ``ULPF_*`` variables that are not
+already set in the process environment.
+
 Secrets (API tokens, signing keys) are read from files so they can be mounted as
 Docker secrets rather than passed through the environment or baked into images.
 """
@@ -10,6 +13,39 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_dotenv(path: Path | None = None) -> dict[str, str]:
+    """Copy ``ULPF_*`` entries from a ``.env`` file into ``os.environ``.
+
+    Variables already present in the process environment win, so Docker / Compose / shell
+    exports override the file. Returns the entries that were applied.
+    """
+    path = path or ROOT / ".env"
+    if not path.is_file():
+        return {}
+    applied: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, sep, value = line.partition("=")
+        key = key.strip()
+        if not sep or not key.startswith("ULPF_") or key in os.environ:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        elif " #" in value:
+            value = value.split(" #", 1)[0].rstrip()
+        os.environ[key] = value
+        applied[key] = value
+    return applied
+
+
+load_dotenv()
 
 
 def _env(name: str, default: str) -> str:
@@ -61,6 +97,12 @@ class Settings:
     # Raw log samples are sensitive: the LLM endpoint must be loopback / in-cluster unless explicitly allowed.
     ollama_allowed_hosts: list[str] = field(default_factory=lambda: _list(
         "OLLAMA_ALLOWED_HOSTS", "localhost,127.0.0.1,::1,ollama"))
+    # A non-empty LM Studio API key switches the generator to LM Studio's OpenAI-compatible API.
+    lmstudio_api_key: str = field(default_factory=lambda: secret_from_file("LMSTUDIO_API_KEY") or "")
+    lmstudio_url: str = field(default_factory=lambda: _env("LMSTUDIO_URL", "http://127.0.0.1:1234/v1"))
+    lmstudio_model: str = field(default_factory=lambda: _env("LMSTUDIO_MODEL", ""))
+    # "none" stops reasoning models from spending the token budget on hidden thinking; empty omits the field.
+    lmstudio_reasoning_effort: str = field(default_factory=lambda: _env("LMSTUDIO_REASONING_EFFORT", "none"))
 
     # API security
     tokens_file: Path = field(default_factory=lambda: Path(_env("TOKENS_FILE", str(ROOT / "data" / "tokens.json"))))

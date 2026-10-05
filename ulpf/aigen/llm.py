@@ -1,4 +1,4 @@
-"""Local LLM (Ollama) assistant for parser synthesis.
+"""Local LLM (Ollama or LM Studio) assistant for parser synthesis.
 
 Security posture
 * The endpoint must resolve to an allow-listed host (loopback / in-cluster
@@ -63,30 +63,61 @@ def _flat_paths(cls: str, max_depth: int = 3, limit: int = 400) -> list[str]:
     return out
 
 
+REPLY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "class": {"type": "string"},
+        "vendor": {"type": "string"},
+        "product": {"type": "string"},
+        "rename": {"type": "object", "additionalProperties": {"type": "string"}},
+        "mapping": {"type": "object", "additionalProperties": {"type": "string"}},
+    },
+    "required": ["class", "mapping"],
+}
+
+
 class OllamaClient:
+    """Ollama by default; LM Studio (OpenAI-compatible API) when ``ULPF_LMSTUDIO_API_KEY`` is set."""
+
     def __init__(self, settings: Settings, timeout: float = 90.0):
-        self.url = settings.ollama_url.rstrip("/")
-        self.model = settings.ollama_model
+        self._key = settings.lmstudio_api_key
+        self.backend = "lmstudio" if self._key else "ollama"
+        if self.backend == "lmstudio":
+            self.url = settings.lmstudio_url.rstrip("/")
+            self.model = settings.lmstudio_model
+            if not self.model:
+                raise LLMUnavailable("ULPF_LMSTUDIO_MODEL must be set when ULPF_LMSTUDIO_API_KEY is set")
+        else:
+            self.url = settings.ollama_url.rstrip("/")
+            self.model = settings.ollama_model
         host = (urlparse(self.url).hostname or "").lower()
         if host not in {h.lower() for h in settings.ollama_allowed_hosts}:
             raise LLMUnavailable(f"LLM host {host!r} is not in ULPF_OLLAMA_ALLOWED_HOSTS")
         self.timeout = timeout
+        self.max_depth = settings.max_json_depth
+        self.reasoning_effort = settings.lmstudio_reasoning_effort
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._key}"} if self.backend == "lmstudio" else {}
 
     def available(self) -> bool:
         try:
+            if self.backend == "lmstudio":
+                r = httpx.get(f"{self.url}/models", headers=self._headers(), timeout=3.0)
+                return r.status_code == 200 and self.model in {m.get("id") for m in r.json().get("data", [])}
             r = httpx.get(f"{self.url}/api/tags", timeout=3.0)
             names = {m.get("name") for m in r.json().get("models", [])}
             return r.status_code == 200 and (self.model in names or f"{self.model}:latest" in names)
         except Exception:
             return False
 
-    def generate_json(self, system: str, prompt: str) -> dict:
+    def _post(self, path: str, payload: dict) -> dict:
         try:
-            with httpx.stream("POST", f"{self.url}/api/generate", timeout=self.timeout, json={
-                "model": self.model, "system": system, "prompt": prompt, "format": "json", "stream": False,
-                "options": {"temperature": 0.1, "num_predict": 1500},
-            }) as r:
-                r.raise_for_status()
+            with httpx.stream("POST", f"{self.url}{path}", headers=self._headers(), timeout=self.timeout,
+                              json=payload) as r:
+                if r.is_error:
+                    detail = r.read()[:500].decode("utf-8", "replace").strip()
+                    raise LLMUnavailable(f"{self.backend} HTTP {r.status_code} at {path}: {detail or r.reason_phrase}")
                 body = b""
                 for chunk in r.iter_bytes():
                     body += chunk
@@ -94,8 +125,39 @@ class OllamaClient:
                         raise LLMUnavailable("LLM reply too large")
         except httpx.HTTPError as exc:
             raise LLMUnavailable(str(exc)) from exc
-        outer = safe_json_loads(body.decode("utf-8", "replace"))
-        inner = safe_json_loads(str(outer.get("response", "{}"))[:MAX_REPLY])
+        outer = safe_json_loads(body.decode("utf-8", "replace"), self.max_depth)
+        if not isinstance(outer, dict):
+            raise LLMUnavailable("LLM endpoint did not return a JSON object")
+        return outer
+
+    def generate_json(self, system: str, prompt: str) -> dict:
+        if self.backend == "lmstudio":
+            payload = {
+                "model": self.model, "stream": False, "temperature": 0.1, "max_tokens": 1500,
+                # LM Studio rejects {"type": "json_object"}; only json_schema or text are accepted.
+                "response_format": {"type": "json_schema",
+                                    "json_schema": {"name": "ulpf_suggestion", "schema": REPLY_SCHEMA}},
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            }
+            if self.reasoning_effort:
+                payload["reasoning_effort"] = self.reasoning_effort
+            outer = self._post("/chat/completions", payload)
+            try:
+                choice = outer["choices"][0]
+                text = choice["message"]["content"]
+            except (KeyError, IndexError, TypeError) as exc:
+                raise LLMUnavailable("LM Studio reply has no message content") from exc
+            if not text:
+                raise LLMUnavailable(f"LM Studio returned no content (finish_reason="
+                                     f"{choice.get('finish_reason')!r}); reasoning models need "
+                                     "ULPF_LMSTUDIO_REASONING_EFFORT=none")
+        else:
+            outer = self._post("/api/generate", {
+                "model": self.model, "system": system, "prompt": prompt, "format": "json", "stream": False,
+                "options": {"temperature": 0.1, "num_predict": 1500},
+            })
+            text = outer.get("response", "{}")
+        inner = safe_json_loads(str(text)[:MAX_REPLY], self.max_depth)
         if not isinstance(inner, dict):
             raise LLMUnavailable("LLM did not return a JSON object")
         return inner
@@ -130,6 +192,10 @@ def suggest(client: OllamaClient, fields: dict[str, list[str]], candidates: list
     for path, raw in (reply.get("mapping") or {}).items():
         if not isinstance(path, str) or not isinstance(raw, str):
             continue
+        if raw not in fields and path in fields:  # smaller models often reply field -> path
+            path, raw = raw, path
+        if path.startswith(f"{target}."):
+            path = path[len(target) + 1:]
         if raw not in fields:
             out["rejected"].append(f"{path}: unknown field {raw!r}")
         elif not ocsf.known_path(target, path):

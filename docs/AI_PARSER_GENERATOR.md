@@ -72,6 +72,8 @@ A `_semantic_model()` helper (sentence-transformers) exists in comments/docstrin
 - System prompt treats `<samples>` as untrusted data and asks for `{"class","vendor","product","rename","mapping"}`.
 - Validation: class in candidates; mapped fields actually extracted; paths pass `ocsf.known_path`; rename identifiers `^[A-Za-z0-9_]{1,48}$`.
 
+**LM Studio.** When `ULPF_LMSTUDIO_API_KEY` is non-empty, the same client switches to LM Studio's OpenAI-compatible API at `ULPF_LMSTUDIO_URL` (default `http://127.0.0.1:1234/v1`) with `Authorization: Bearer <key>`. `available()` is `GET /models` and checks that `ULPF_LMSTUDIO_MODEL` is listed in `data[].id`; `generate_json` is `POST /chat/completions` with system and user messages, a `json_schema` response format (LM Studio rejects `json_object`), `reasoning_effort` from `ULPF_LMSTUDIO_REASONING_EFFORT` (default `none`), temperature 0.1, `max_tokens` 1500, and parses `choices[0].message.content`. Empty content raises `LLMUnavailable`. Mappings returned as field → path are swapped before validation. The host allow-list, reply cap, and validation are the same as for Ollama. A key without `ULPF_LMSTUDIO_MODEL` raises `LLMUnavailable`. The draft's `provenance.llm.backend` records `ollama` or `lmstudio`.
+
 **Rename suggestions are validated and then ignored** (`synth.py` never applies them). Compose does not set `ULPF_OLLAMA_URL`, so the `ollama` service is not reached from the container (default is localhost). The generator still works: `use_llm` falls back to the offline mapper. Tests use `use_llm="off"`.
 
 ## Self-test (`selftest.py`)

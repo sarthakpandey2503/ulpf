@@ -177,8 +177,8 @@ def synthesize(samples: list[str], settings: Settings, vendor: str | None = None
                 cands = list(dict.fromkeys([cls, "network_activity", "detection_finding", "authentication",
                                             "http_activity", "dns_activity"]))
                 sug = suggest(client, values, cands, samples[:3])
-                llm_info = {"used": True, "model": client.model, "rejected": sug["rejected"][:20],
-                            "class": sug["class"]}
+                llm_info = {"used": True, "backend": client.backend, "model": client.model,
+                            "rejected": sug["rejected"][:20], "class": sug["class"]}
                 if sug["class"]:
                     cls = sug["class"]
                 used = {m.raw for m in matches.values()}
