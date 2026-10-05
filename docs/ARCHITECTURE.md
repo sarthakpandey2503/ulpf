@@ -1,6 +1,6 @@
 # ULPF architecture
 
-Problem statement 26156 asks for a vendor-neutral pipeline that keeps the original log, parses source fields, maps them into one taxonomy, and stays traceable. ULPF does that in one process for a demo, and as a partitioned consumer group when the volume grows.
+ULPF is a vendor-neutral pipeline that keeps the original log, parses source fields, maps them into one taxonomy, and stays traceable. It runs as one process on a single machine, and is designed to run as a partitioned consumer group when the volume grows.
 
 ## Path of one event
 
@@ -12,7 +12,7 @@ Events are sealed in batches. Each leaf is `SHA-256(0x00 || sha256(raw) || sha25
 
 ## Scale-out
 
-The default bus is in-process. Set `ULPF_BUS=kafka` and run `ulpf worker`: collectors publish to `ulpf.raw`, stateless workers (consumer group `ulpf-workers`) normalize, and they publish to `ulpf.normalized` only after the sink write succeeds (at-least-once). Sinks are SQLite (the dashboard), Parquet on disk or MinIO, ClickHouse, Splunk HEC, Elasticsearch, and CEF forward. Parser workers hold no cross-event state, so adding workers adds throughput. ClickHouse and Parquet are the analytics and data-lake exits the problem statement asks for.
+The default bus is in-process. The scale-out design is `ulpf worker` with Kafka/Redpanda: collectors publish to `ulpf.raw`, stateless workers (consumer group `ulpf-workers`) normalize, and they publish to `ulpf.normalized` only after the sink write succeeds (at-least-once). The worker side exists; the producer side is not wired yet (`ULPF_BUS` is never read), see [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Sinks are SQLite (the dashboard), Parquet on disk or MinIO, ClickHouse, Splunk HEC, Elasticsearch, and CEF forward. Parser workers hold no cross-event state, so adding workers adds throughput. ClickHouse and Parquet are the analytics and data-lake exits.
 
 ## Why the three extra pieces are in the hot path
 
@@ -20,12 +20,12 @@ The default bus is in-process. Set `ULPF_BUS=kafka` and run `ulpf worker`: colle
 
 **Schema Fidelity.** The validator replays paired true-positive and benign datasets through ULPF and through a rule engine that can see either the raw event or the normalized one. The score is the share of cases whose verdict survives normalization. The checked-in summary is 100% fidelity for the full envelope versus 91% when only native OCSF paths are visible, on 551 datasets and 539 rules.
 
-**Lineage.** The Blockchain theme is met without an external chain or a network. An auditor can recompute the leaf from the raw bytes and the normalized JSON, check the Merkle path to a signed root, and follow the hash chain to genesis. Anchors can be copied to write-once media.
+**Lineage.** Tamper evidence comes without an external chain or a network. An auditor can recompute the leaf from the raw bytes and the normalized JSON, check the Merkle path to a signed root, and follow the hash chain to genesis. Anchors can be copied to write-once media.
 
 ## Trust boundary
 
 Log text is treated as hostile. Limits cover line size, JSON depth, field count, HTTP body size, and batch size. Tokens are stored as SHA-256 hashes and compared in constant time. The dashboard is same-origin, with a content security policy that allows only local scripts. Pack YAML is loaded with the safe loader. AI drafts never become active packs by themselves. The container image drops all capabilities, runs read-only as a non-root user, and does not require outbound network access.
 
-## What is deliberately not in this prototype
+## What is deliberately not built yet
 
-A laptop-scale SQLite ledger is the demo store. The same envelope is what the ClickHouse and Parquet sinks write; those are the production exits. Hot packs can later be compiled to Vector VRL or Rust without changing the YAML contract. The 2-minute demo and the five slides are in `docs/`.
+A single-machine SQLite ledger is the local store. The same envelope is what the ClickHouse and Parquet sinks write; those are the production exits. Hot packs can later be compiled to Vector VRL or Rust without changing the YAML contract. Code-level details are in [CODEBASE_GUIDE.md](CODEBASE_GUIDE.md).
